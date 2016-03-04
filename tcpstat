@@ -1,0 +1,100 @@
+#!/bin/sh
+# -*- sh -*-
+
+: << =cut
+
+=head1 NAME
+
+tcpstat - Plugin to monitor system TCP connections status
+
+=head1 CONFIGURATION
+
+No configuration
+
+=head1 AUTHOR
+
+Jinyu Liu <simon.jinyu.liu@gmail.com>
+
+=head1 LICENSE
+
+GPLv2
+
+=back
+
+=head1 MAGIC MARKERS
+
+ #%# family=auto
+ #%# capabilities=autoconf
+
+=cut
+
+. ${MUNIN_LIBDIR:-/usr/share/munin}/plugins/plugin.sh
+
+if [ "$1" = "autoconf" ]; then
+        if ( ss -ant 2>/dev/null >/dev/null ); then
+                echo yes
+                exit 0
+        else
+                if [ $? -eq 127 ]
+                then
+                        echo "no (ss program not found)"
+                        exit 0
+                else
+                        echo no
+                        exit 0
+                fi
+        fi
+fi
+
+if [ "$1" = "config" ]; then
+
+        echo 'graph_title TCP Connection Status'
+        echo 'graph_args --base 1000 --logarithmic'
+        echo 'graph_vlabel TCP connections'
+        echo 'graph_category network'
+        echo 'graph_period second'
+        echo 'graph_info This graph shows the system TCP connections status.'
+        echo 'establish.label establish'
+        echo 'establish.type DERIVE'
+        echo 'establish.max 50000'
+        echo 'establish.min 0'
+        echo 'establish.info The number of establish TCP connection.'
+        print_warning establish
+        print_critical establish
+        echo 'time_wait.label time_wait'
+        echo 'time_wait.type DERIVE'
+        echo 'time_wait.max 50000'
+        echo 'time_wait.min 0'
+        echo 'time_wait.info The number of time_wait TCP connection.'
+        print_warning time_wait
+        print_critical time_wait
+        echo 'close_wait.label close_wait'
+        echo 'close_wait.type DERIVE'
+        echo 'close_wait.max 50000'
+        echo 'close_wait.min 0'
+        echo 'close_wait.info The number of close_wait TCP connection.'
+        print_warning close_wait
+        print_critical close_wait
+        echo 'listen.label listen'
+        echo 'listen.type DERIVE'
+        echo 'listen.max 50000'
+        echo 'listen.min 0'
+        echo 'listen.info The number of listen TCP connection.'
+        print_warning listen
+        print_critical listen
+        exit 0
+fi
+
+status=$(ss -ant | awk '
+    NR>1 {++s[$1]} END {for(k in s) print k,":",s[k]}
+' | sed 's/ : /:/g' | sed 's/ /\n/g')
+
+estab=$(echo $status | grep -o 'ESTAB:[0-9]\+' | cut -d: -f2)
+time_wait=$(echo $status | grep -o 'TIME-WAIT:[0-9]\+' | cut -d: -f2)
+close_wait=$(echo $status | grep -o 'CLOSE-WAIT:[0-9]\+' | cut -d: -f2)
+listen=$(echo $status | grep -o 'LISTEN:[0-9]\+' | cut -d: -f2)
+
+echo "establish.value " ${estab:-0}
+echo "time_wait.value " ${time_wait:-0}
+echo "close_wait.value " ${close_wait:-0}
+echo "listen.value " ${listen:-0}
